@@ -50,33 +50,6 @@ def login(login_request: LoginRequest, db: Session = Depends(get_db)):
 
     return {"access_token": access_token, "token_type": "bearer"}
 
-
-@router.post("/register", response_model=UserSchema)
-def register(user_create: UserCreate, db: Session = Depends(get_db)):
-    """Register a new user"""
-    # Check if user already exists
-    existing_user = db.query(User).filter(User.email == user_create.email).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
-        )
-
-    # Create new user
-    new_user = User(
-        id=generate_id(),
-        email=user_create.email,
-        name=user_create.name,
-        hashed_password=get_password_hash(user_create.password)
-    )
-
-    db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
-
-    return new_user
-
-
 @router.get("/me", response_model=UserSchema)
 def get_me(current_user: User = Depends(get_current_user_or_api_key)):
     """Get current user information"""

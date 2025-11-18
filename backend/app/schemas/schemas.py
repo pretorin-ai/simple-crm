@@ -124,11 +124,6 @@ class UserBase(BaseModel):
     email: EmailStr
     name: str
 
-
-class UserCreate(UserBase):
-    password: str
-
-
 class UserCreateByAdmin(UserBase):
     password: str
     role: str = "user"
