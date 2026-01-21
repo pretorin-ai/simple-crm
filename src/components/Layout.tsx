@@ -5,18 +5,20 @@ import { Button } from '@/components/ui/button';
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, logout, queueCounts } = useAuth();
+
+  const pendingReassignments = queueCounts?.pending_reassignments || 0;
 
   const navItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: Home },
-    { path: '/contacts', label: 'Contacts', icon: Users },
-    { path: '/contracts', label: 'Contracts', icon: FileText },
-    { path: '/api-settings', label: 'API', icon: Key },
+    { path: '/dashboard', label: 'Dashboard', icon: Home, badge: 0 },
+    { path: '/contacts', label: 'Contacts', icon: Users, badge: pendingReassignments },
+    { path: '/contracts', label: 'Contracts', icon: FileText, badge: 0 },
+    { path: '/api-settings', label: 'API', icon: Key, badge: 0 },
   ];
 
   // Add admin-only nav items
   if (isAdmin) {
-    navItems.push({ path: '/users', label: 'Users', icon: Shield });
+    navItems.push({ path: '/users', label: 'Users', icon: Shield, badge: 0 });
   }
 
   return (
@@ -68,6 +70,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   >
                     <Icon className="h-4 w-4" />
                     {item.label}
+                    {item.badge > 0 && (
+                      <span className="ml-1 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold leading-none text-white bg-destructive rounded-full">
+                        {item.badge}
+                      </span>
+                    )}
                   </Link>
                 </li>
               );

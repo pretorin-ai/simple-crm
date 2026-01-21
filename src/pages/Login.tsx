@@ -1,33 +1,57 @@
-import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/contexts/AuthContext';
+import { getOIDCConfig, OIDCConfig } from '@/lib/api';
+import { generatePKCE, storePKCEVerifier, buildAuthorizationUrl } from '@/lib/oidc';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const [oidcConfig, setOidcConfig] = useState<OIDCConfig | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
+  const { user } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    console.log('Login attempt with:', email);
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
+  // Fetch OIDC config on mount
+  useEffect(() => {
+    getOIDCConfig()
+      .then((config) => {
+        if (!config.enabled) {
+          setConfigError('Single sign-on is not configured. Please contact your administrator.');
+        } else {
+          setOidcConfig(config);
+        }
+      })
+      .catch(() => {
+        setConfigError('Unable to connect to authentication service. Please try again later.');
+      });
+  }, []);
+
+  const handleGoogleLogin = async () => {
+    if (!oidcConfig?.enabled) return;
+
+    setIsLoading(true);
     try {
-      await login({ email, password });
-      console.log('Login successful');
-      toast.success('Welcome back!');
-      navigate('/dashboard');
+      // Generate PKCE code verifier and challenge
+      const { codeVerifier, codeChallenge } = await generatePKCE();
+
+      // Store verifier in sessionStorage (survives redirect)
+      storePKCEVerifier(codeVerifier);
+
+      // Build authorization URL and redirect to Google
+      const authUrl = buildAuthorizationUrl(oidcConfig, codeChallenge);
+      window.location.href = authUrl;
     } catch (error) {
-      console.error('Login error:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to login');
-    } finally {
+      toast.error('Failed to initiate sign-in. Please try again.');
       setIsLoading(false);
     }
   };
@@ -35,50 +59,38 @@ export default function Login() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
+        <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold">Pretorin CRM</CardTitle>
           <CardDescription>
-            Enter your credentials to access your account
+            Sign in with your organization account
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="your.email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
+        <CardContent className="space-y-4">
+          {configError ? (
+            <div className="text-center text-sm text-muted-foreground p-4 bg-muted rounded-md">
+              {configError}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
-            </div>
-            <div className="flex items-center justify-end">
-              <Link
-                to="/forgot-password"
-                className="text-sm text-blue-600 hover:text-blue-500 hover:underline"
-              >
-                Forgot password?
-              </Link>
-            </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
+          ) : (
+            <Button
+              type="button"
+              className="w-full"
+              size="lg"
+              onClick={handleGoogleLogin}
+              disabled={isLoading || !oidcConfig?.enabled}
+            >
+              {isLoading ? (
+                <>
+                  <div className="h-4 w-4 mr-2 animate-spin rounded-full border-2 border-background border-t-transparent" />
+                  Redirecting...
+                </>
+              ) : (
+                'Sign in'
+              )}
             </Button>
-          </form>
+          )}
+          <p className="text-xs text-center text-muted-foreground">
+            Access is restricted to authorized organization members only.
+          </p>
         </CardContent>
       </Card>
     </div>

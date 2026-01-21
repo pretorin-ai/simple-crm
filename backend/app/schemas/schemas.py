@@ -32,6 +32,11 @@ class Contact(ContactBase):
     last_contacted_at: Optional[datetime] = None
     assigned_user_id: str
     assigned_user: Optional["User"] = None
+    created_via: str = "user"
+    is_claimed: bool = True
+    pending_acceptance: bool = False
+    reassigned_by_user_id: Optional[str] = None
+    reassigned_by_user: Optional["User"] = None
 
     class Config:
         from_attributes = True
@@ -80,6 +85,11 @@ class Contract(ContractBase):
     id: str
     created_at: datetime
     assigned_contact_ids: List[str] = []
+    created_via: str = "user"
+    is_claimed: bool = True
+    claimed_by_user_id: Optional[str] = None
+    acknowledged_by_current_user: bool = False
+    acknowledged_by_user_ids: List[str] = []
 
     class Config:
         from_attributes = True
@@ -124,8 +134,9 @@ class UserBase(BaseModel):
     email: EmailStr
     name: str
 
+
 class UserCreateByAdmin(UserBase):
-    password: str
+    """Schema for admin user pre-provisioning (SSO-only mode)"""
     role: str = "user"
 
 
@@ -147,31 +158,36 @@ class User(UserBase):
         from_attributes = True
 
 
-# Password reset schemas
-class PasswordResetRequest(BaseModel):
-    email: EmailStr
+# OIDC Auth schemas
+class OIDCAuthRequest(BaseModel):
+    """Request to exchange authorization code for tokens"""
+    code: str
+    code_verifier: str
 
 
-class PasswordReset(BaseModel):
-    token: str
-    new_password: str
-
-
-class PasswordChange(BaseModel):
-    current_password: str
-    new_password: str
-
-
-# Auth schemas
-class Token(BaseModel):
+class OIDCAuthResponse(BaseModel):
+    """Response after successful OIDC authentication"""
     access_token: str
     token_type: str
+    user: "User"
 
 
-class TokenData(BaseModel):
-    email: Optional[str] = None
+class OIDCConfigResponse(BaseModel):
+    """OIDC configuration for frontend"""
+    client_id: str
+    authorization_endpoint: str
+    redirect_uri: str
+    enabled: bool
 
 
-class LoginRequest(BaseModel):
-    email: EmailStr
-    password: str
+# Queue schemas
+class QueueCounts(BaseModel):
+    """Counts for queue badges"""
+    unclaimed_contacts: int
+    unclaimed_contracts: int
+    pending_reassignments: int
+
+
+class ClaimRequest(BaseModel):
+    """Request to claim a contact or contract"""
+    assigned_user_id: Optional[str] = None  # If None, assigns to current user

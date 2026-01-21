@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import * as api from '@/lib/api';
-import { ArrowLeft, Edit, Trash2, Plus, Mail, Phone, Building, Calendar, Loader2, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Plus, Mail, Phone, Building, Calendar, Loader2, User as UserIcon, Copy } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -104,6 +104,7 @@ export default function ContactDetail() {
     try {
       if (id === 'new') {
         const created = await api.createContact(editForm as api.ContactCreate);
+        setIsEditDialogOpen(false);
         toast.success('Contact created successfully');
         navigate(`/contacts/${created.id}`);
       } else if (contact) {
@@ -122,7 +123,7 @@ export default function ContactDetail() {
       try {
         await api.deleteContact(contact.id);
         toast.success('Contact deleted successfully');
-        navigate('/contacts');
+        navigate('/contacts', { replace: true });
       } catch (error) {
         toast.error('Failed to delete contact');
       }
@@ -310,9 +311,21 @@ export default function ContactDetail() {
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
                 <Mail className="h-4 w-4 text-muted-foreground" />
-                <div>
+                <div className="flex-1">
                   <p className="text-sm font-medium">Email</p>
-                  <p className="text-sm text-muted-foreground">{contact.email}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-muted-foreground">{contact.email}</p>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(contact.email);
+                        toast.success('Email copied!');
+                      }}
+                      className="p-1 hover:bg-muted rounded transition-colors"
+                      title="Copy email"
+                    >
+                      <Copy className="h-3 w-3 text-muted-foreground" />
+                    </button>
+                  </div>
                 </div>
               </div>
               {contact.phone && (

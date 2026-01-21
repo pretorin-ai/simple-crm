@@ -57,16 +57,6 @@ async function fetchApi<T>(
 }
 
 // Auth API
-export interface LoginCredentials {
-  email: string;
-  password: string;
-}
-
-export interface AuthToken {
-  access_token: string;
-  token_type: string;
-}
-
 export interface User {
   id: string;
   email: string;
@@ -80,7 +70,6 @@ export interface User {
 export interface UserCreateByAdmin {
   email: string;
   name: string;
-  password: string;
   role: 'admin' | 'user';
 }
 
@@ -89,27 +78,6 @@ export interface UserUpdate {
   email?: string;
   role?: 'admin' | 'user';
   is_active?: boolean;
-}
-
-export interface PasswordResetRequest {
-  email: string;
-}
-
-export interface PasswordReset {
-  token: string;
-  new_password: string;
-}
-
-export interface PasswordChange {
-  current_password: string;
-  new_password: string;
-}
-
-export async function login(credentials: LoginCredentials): Promise<AuthToken> {
-  return fetchApi<AuthToken>('/auth/login', {
-    method: 'POST',
-    body: JSON.stringify(credentials),
-  });
 }
 
 export async function getCurrentUser(): Promise<User> {
@@ -133,6 +101,11 @@ export interface Contact {
   last_contacted_at?: string;
   assigned_user_id: string;
   assigned_user?: User;
+  created_via: 'user' | 'api';
+  is_claimed: boolean;
+  pending_acceptance: boolean;
+  reassigned_by_user_id?: string;
+  reassigned_by_user?: User;
 }
 
 export interface ContactCreate {
@@ -224,6 +197,11 @@ export interface Contract {
   notes: string;
   created_at: string;
   assigned_contact_ids: string[];
+  created_via: 'user' | 'api';
+  is_claimed: boolean;
+  claimed_by_user_id?: string;
+  acknowledged_by_current_user: boolean;
+  acknowledged_by_user_ids: string[];
 }
 
 export interface ContractCreate {
@@ -303,28 +281,6 @@ export async function deleteUser(userId: string): Promise<{ message: string }> {
   });
 }
 
-// Password reset API
-export async function requestPasswordReset(email: string): Promise<{ message: string }> {
-  return fetchApi<{ message: string }>('/auth/password-reset-request', {
-    method: 'POST',
-    body: JSON.stringify({ email }),
-  });
-}
-
-export async function resetPassword(data: PasswordReset): Promise<{ message: string }> {
-  return fetchApi<{ message: string }>('/auth/password-reset', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-}
-
-export async function changePassword(data: PasswordChange): Promise<{ message: string }> {
-  return fetchApi<{ message: string }>('/auth/password-change', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-}
-
 // API Key Management
 export interface ApiKeyResponse {
   api_key: string;
@@ -350,4 +306,87 @@ export async function revokeApiKey(): Promise<{ message: string }> {
 
 export async function getApiKeyStatus(): Promise<ApiKeyStatus> {
   return fetchApi<ApiKeyStatus>('/users/me/api-key/status');
+}
+
+// OIDC Authentication API
+export interface OIDCConfig {
+  client_id: string;
+  authorization_endpoint: string;
+  redirect_uri: string;
+  enabled: boolean;
+}
+
+export interface OIDCCallbackRequest {
+  code: string;
+  code_verifier: string;
+}
+
+export interface OIDCAuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
+export async function getOIDCConfig(): Promise<OIDCConfig> {
+  return fetchApi<OIDCConfig>('/auth/oidc/config');
+}
+
+export async function oidcCallback(request: OIDCCallbackRequest): Promise<OIDCAuthResponse> {
+  return fetchApi<OIDCAuthResponse>('/auth/oidc/callback', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
+
+// Queue API
+export interface QueueCounts {
+  unclaimed_contacts: number;
+  unclaimed_contracts: number;
+  pending_reassignments: number;
+}
+
+export interface ClaimRequest {
+  assigned_user_id?: string;
+}
+
+export async function getQueueCounts(): Promise<QueueCounts> {
+  return fetchApi<QueueCounts>('/queue/counts');
+}
+
+export async function getUnclaimedContacts(): Promise<Contact[]> {
+  return fetchApi<Contact[]>('/queue/contacts/unclaimed');
+}
+
+export async function getUnclaimedContracts(): Promise<Contract[]> {
+  return fetchApi<Contract[]>('/queue/contracts/unclaimed');
+}
+
+export async function claimContact(contactId: string, request?: ClaimRequest): Promise<Contact> {
+  return fetchApi<Contact>(`/queue/contacts/${contactId}/claim`, {
+    method: 'POST',
+    body: JSON.stringify(request || {}),
+  });
+}
+
+export async function claimContract(contractId: string, request?: ClaimRequest): Promise<Contract> {
+  return fetchApi<Contract>(`/queue/contracts/${contractId}/claim`, {
+    method: 'POST',
+    body: JSON.stringify(request || {}),
+  });
+}
+
+export async function getPendingAcceptanceContacts(): Promise<Contact[]> {
+  return fetchApi<Contact[]>('/queue/contacts/pending-acceptance');
+}
+
+export async function acceptContactReassignment(contactId: string): Promise<Contact> {
+  return fetchApi<Contact>(`/queue/contacts/${contactId}/accept`, {
+    method: 'POST',
+  });
+}
+
+export async function rejectContactReassignment(contactId: string): Promise<Contact> {
+  return fetchApi<Contact>(`/queue/contacts/${contactId}/reject`, {
+    method: 'POST',
+  });
 }

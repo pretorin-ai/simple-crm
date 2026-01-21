@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import * as api from '@/lib/api';
-import { ArrowLeft, Trash2, Save, ExternalLink, Loader2, Edit, X } from 'lucide-react';
+import { ArrowLeft, Trash2, Save, ExternalLink, Loader2, Edit, X, Check, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ContractDetail() {

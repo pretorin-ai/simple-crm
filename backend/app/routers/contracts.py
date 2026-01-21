@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import delete
 from typing import List
 from datetime import datetime
 from app.database import get_db
-from app.models.models import Contract, Contact, User
+from app.models.models import Contract, Contact, User, contract_acknowledgments
 from app.schemas.schemas import (
     Contract as ContractSchema,
     ContractCreate,
@@ -15,6 +16,19 @@ from app.auth import get_current_user, get_current_user_or_api_key
 from app.seed_data import generate_id
 
 router = APIRouter(prefix="/contracts", tags=["contracts"])
+
+
+def build_contract_response(contract: Contract, current_user_id: str) -> dict:
+    """Build contract response dict with acknowledgment data"""
+    acknowledged_user_ids = [user.id for user in contract.acknowledged_by_users]
+    return {
+        **contract.__dict__,
+        "submission_link": contract.submission_link,
+        "created_at": contract.created_at,
+        "assigned_contact_ids": [contact.id for contact in contract.assigned_contacts],
+        "acknowledged_by_current_user": current_user_id in acknowledged_user_ids,
+        "acknowledged_by_user_ids": acknowledged_user_ids
+    }
 
 
 @router.get("", response_model=List[ContractSchema])
@@ -232,7 +246,9 @@ def import_samgov_opportunities(
                                 status="warm",
                                 needs_follow_up=True,
                                 notes=f"Auto-imported from SAM.gov opportunity: {opp.title}",
-                                assigned_user_id=current_user.id
+                                assigned_user_id=current_user.id,
+                                created_via="api",
+                                is_claimed=False
                             )
                             db.add(new_contact)
                             db.flush()
@@ -249,15 +265,18 @@ def import_samgov_opportunities(
                 notes_parts.append(opp.notes)
 
             # Create contract
+            # Use the SAM.gov UI link as the description so users can easily access the opportunity
             new_contract = Contract(
                 id=generate_id(),
                 title=opp.title[:200],  # Truncate if too long
-                description=opp.description or "",
+                description=opp.uiLink or "",
                 source=opp.source,
                 deadline=deadline,
                 status="prospective",  # Default to prospective
                 submission_link=opp.uiLink,
-                notes="\n".join(notes_parts)
+                notes="\n".join(notes_parts),
+                created_via="api",
+                is_claimed=False
             )
 
             # Assign contacts

@@ -11,7 +11,6 @@ from app.schemas.schemas import (
 from app.auth import (
     get_current_active_user,
     get_current_admin_user,
-    get_password_hash,
     generate_api_key
 )
 from app.seed_data import generate_id
@@ -51,7 +50,12 @@ def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user)
 ):
-    """Create new user - admin only"""
+    """
+    Pre-provision a new user - admin only.
+
+    Creates a user account that will be linked when the user first signs in
+    via Google OAuth. The user's email must match their Google Workspace email.
+    """
     # Check if email already exists
     existing_user = db.query(User).filter(User.email == user_create.email).first()
     if existing_user:
@@ -67,12 +71,13 @@ def create_user(
             detail="Invalid role. Must be 'admin' or 'user'"
         )
 
-    # Create user
+    # Create user (SSO-only - no password)
     new_user = User(
         id=generate_id(),
         email=user_create.email,
         name=user_create.name,
-        hashed_password=get_password_hash(user_create.password),
+        hashed_password="",
+        auth_provider="google",
         role=user_create.role,
         is_active=True,
         created_by=current_user.id

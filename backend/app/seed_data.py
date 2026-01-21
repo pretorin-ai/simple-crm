@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from app.models.models import Contact, Communication, Contract, User
 from app.auth import get_password_hash
 import uuid
@@ -11,7 +11,7 @@ def generate_id():
 
 def get_seed_contacts(user_id):
     """Return seed data for contacts"""
-    base_date = datetime.utcnow()
+    base_date = datetime.now(UTC)
 
     return [
         Contact(
@@ -98,7 +98,7 @@ def get_seed_contacts(user_id):
 
 def get_seed_communications(contacts):
     """Return seed data for communications"""
-    base_date = datetime.utcnow()
+    base_date = datetime.now(UTC)
 
     # Assuming first contact is Sarah Johnson
     sarah_id = contacts[0].id if contacts else generate_id()
@@ -143,7 +143,7 @@ def get_seed_communications(contacts):
 
 def get_seed_contracts(contacts):
     """Return seed data for contracts"""
-    base_date = datetime.utcnow()
+    base_date = datetime.now(UTC)
 
     sarah_id = contacts[0].id if contacts else generate_id()
     emily_id = contacts[2].id if len(contacts) > 2 else generate_id()
@@ -204,50 +204,14 @@ def get_seed_contracts(contacts):
     return contracts
 
 
-def get_seed_user():
-    """Return seed user (default credentials: demo@pretorin.com / demo123)"""
-    return User(
-        id=generate_id(),
-        email="demo@pretorin.com",
-        name="Demo Admin User",
-        hashed_password=get_password_hash("demo123"),
-        role="admin",
-        is_active=True,
-        created_at=datetime.utcnow()
-    )
-
-
 def seed_database(db):
-    """Seed the database with initial data"""
-    # Check if data already exists
-    existing_user = db.query(User).first()
-    if existing_user:
-        print("Database already seeded. Skipping...")
-        return
+    """
+    Seed the database with initial data.
 
-    print("Seeding database...")
-
-    # Add user
-    user = get_seed_user()
-    db.add(user)
-    db.flush()  # Flush to get user ID for contacts
-
-    # Add contacts
-    contacts = get_seed_contacts(user.id)
-    for contact in contacts:
-        db.add(contact)
-    db.flush()  # Flush to get IDs for relationships
-
-    # Add communications
-    communications = get_seed_communications(contacts)
-    for communication in communications:
-        db.add(communication)
-
-    # Add contracts
-    contracts = get_seed_contracts(contacts)
-    for contract in contracts:
-        db.add(contract)
-
-    db.commit()
-    print("Database seeded successfully!")
-    print(f"Default user: {user.email} / demo123")
+    In SSO-only mode, no seed data is created. The first user to sign in
+    via Google OAuth will automatically become an admin.
+    """
+    # SSO-only mode: no seed data needed
+    # The first user to authenticate via Google becomes admin automatically
+    print("SSO-only mode: No seed data created.")
+    print("The first user to sign in via Google will become admin.")

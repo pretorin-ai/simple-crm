@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -31,9 +31,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Create a JWT access token"""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.now(UTC) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -98,7 +98,7 @@ def generate_password_reset_token() -> str:
 def create_password_reset_token(user: User, db: Session) -> str:
     """Create and store password reset token"""
     token = generate_password_reset_token()
-    expires = datetime.utcnow() + timedelta(hours=24)
+    expires = datetime.now(UTC) + timedelta(hours=24)
 
     user.password_reset_token = token
     user.password_reset_expires = expires
@@ -111,7 +111,7 @@ def verify_reset_token(token: str, db: Session) -> Optional[User]:
     """Verify password reset token and return user if valid"""
     user = db.query(User).filter(
         User.password_reset_token == token,
-        User.password_reset_expires > datetime.utcnow()
+        User.password_reset_expires > datetime.now(UTC)
     ).first()
 
     return user

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, SessionLocal
 from app.models.models import Base
-from app.routers import auth, contacts, communications, contracts, contacts_followup, users
+from app.routers import auth, contacts, communications, contracts, contacts_followup, users, oidc_auth, queue
 from app.seed_data import seed_database
 import os
 
@@ -42,11 +42,13 @@ app.add_middleware(
 
 # Include routers
 app.include_router(auth.router)
+app.include_router(oidc_auth.router)
 app.include_router(contacts.router)
 app.include_router(contacts_followup.router)
 app.include_router(communications.router)
 app.include_router(contracts.router)
 app.include_router(users.router)
+app.include_router(queue.router)
 
 
 @app.get("/")

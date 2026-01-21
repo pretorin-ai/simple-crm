@@ -6,13 +6,16 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import * as api from '@/lib/api';
-import { Plus, Search, Calendar, AlertCircle, Loader2 } from 'lucide-react';
+import { Plus, Search, Calendar, AlertCircle, Loader2, Eye, EyeOff, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ContractsList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('active');
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
   const [contracts, setContracts] = useState<api.Contract[]>([]);
   const [contacts, setContacts] = useState<api.Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);

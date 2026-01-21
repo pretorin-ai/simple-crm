@@ -11,6 +11,15 @@ contract_contacts = Table(
     Column('contact_id', String, ForeignKey('contacts.id'))
 )
 
+# Association table for tracking which users have acknowledged which contracts
+contract_acknowledgments = Table(
+    'contract_acknowledgments',
+    Base.metadata,
+    Column('contract_id', String, ForeignKey('contracts.id'), primary_key=True),
+    Column('user_id', String, ForeignKey('users.id'), primary_key=True),
+    Column('acknowledged_at', DateTime, default=datetime.utcnow)
+)
+
 
 class Contact(Base):
     __tablename__ = "contacts"
@@ -30,10 +39,17 @@ class Contact(Base):
     last_contacted_at = Column(DateTime, nullable=True)
     assigned_user_id = Column(String, ForeignKey("users.id"), nullable=False)
 
+    # Queue fields
+    created_via = Column(String, nullable=False, default="user")  # 'api' or 'user'
+    is_claimed = Column(Boolean, nullable=False, default=True)    # False for API-created
+    pending_acceptance = Column(Boolean, nullable=False, default=False)
+    reassigned_by_user_id = Column(String, ForeignKey("users.id"), nullable=True)
+
     # Relationships
     communications = relationship("Communication", back_populates="contact", cascade="all, delete-orphan")
     contracts = relationship("Contract", secondary=contract_contacts, back_populates="assigned_contacts")
-    assigned_user = relationship("User", back_populates="assigned_contacts")
+    assigned_user = relationship("User", back_populates="assigned_contacts", foreign_keys=[assigned_user_id])
+    reassigned_by_user = relationship("User", foreign_keys=[reassigned_by_user_id])
 
 
 class Communication(Base):
@@ -63,8 +79,14 @@ class Contract(Base):
     notes = Column(String, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Queue fields
+    created_via = Column(String, nullable=False, default="user")
+    is_claimed = Column(Boolean, nullable=False, default=True)
+    claimed_by_user_id = Column(String, ForeignKey("users.id"), nullable=True)
+
     # Relationships
     assigned_contacts = relationship("Contact", secondary=contract_contacts, back_populates="contracts")
+    claimed_by_user = relationship("User", foreign_keys=[claimed_by_user_id])
 
 
 class User(Base):
@@ -73,7 +95,7 @@ class User(Base):
     id = Column(String, primary_key=True, index=True)
     email = Column(String, unique=True, nullable=False, index=True)
     name = Column(String, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=False)  # Empty string for OIDC-only users
     role = Column(String, nullable=False, default="user")  # "admin" or "user"
     is_active = Column(Boolean, nullable=False, default=True)
     api_key = Column(String, unique=True, nullable=True, index=True)
@@ -83,6 +105,10 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # OAuth fields
+    auth_provider = Column(String, nullable=False, default="local")  # 'local' or 'google'
+    google_id = Column(String, unique=True, nullable=True, index=True)  # Google OAuth subject ID
+
     # Relationships
-    assigned_contacts = relationship("Contact", back_populates="assigned_user")
+    assigned_contacts = relationship("Contact", back_populates="assigned_user", foreign_keys="[Contact.assigned_user_id]")
     created_users = relationship("User", remote_side=[id])

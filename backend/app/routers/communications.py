@@ -31,6 +31,31 @@ def get_communications(
         for comm in communications
     ]
 
+
+@router.get("/{communication_id}", response_model=CommunicationSchema)
+def get_communication(
+    communication_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get a specific communication"""
+    communication = db.query(Communication).join(Contact).filter(
+        Communication.id == communication_id,
+        Contact.assigned_user_id == current_user.id
+    ).first()
+    if not communication:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Communication not found"
+        )
+
+    return {
+        **communication.__dict__,
+        "contact_id": communication.contact_id,
+        "created_at": communication.created_at
+    }
+
+
 @router.post("", response_model=CommunicationSchema, status_code=status.HTTP_201_CREATED)
 def create_communication(
     communication: CommunicationCreate,

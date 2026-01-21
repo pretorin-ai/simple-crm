@@ -50,13 +50,12 @@ export default function UserManagement() {
     const userData: UserCreateByAdmin = {
       email: formData.get('email') as string,
       name: formData.get('name') as string,
-      password: formData.get('password') as string,
       role: formData.get('role') as 'admin' | 'user',
     };
 
     try {
       await createUser(userData);
-      toast.success('User created successfully');
+      toast.success('User pre-provisioned. They can now sign in.');
       setIsCreateDialogOpen(false);
       loadUsers();
     } catch (error) {
@@ -106,24 +105,23 @@ export default function UserManagement() {
 
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button>Create New User</Button>
+            <Button>Pre-provision User</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create New User</DialogTitle>
+              <DialogTitle>Pre-provision User</DialogTitle>
             </DialogHeader>
+            <p className="text-sm text-muted-foreground mb-4">
+              Create a user account before they sign in. The email must match their Microsoft account.
+            </p>
             <form onSubmit={handleCreateUser} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
                 <Input id="name" name="name" required />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email (must match Microsoft account)</Label>
                 <Input id="email" name="email" type="email" required />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input id="password" name="password" type="password" required minLength={6} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
@@ -137,7 +135,7 @@ export default function UserManagement() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button type="submit" className="w-full">Create User</Button>
+              <Button type="submit" className="w-full">Pre-provision User</Button>
             </form>
           </DialogContent>
         </Dialog>
