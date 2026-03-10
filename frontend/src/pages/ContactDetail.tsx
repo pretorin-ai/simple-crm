@@ -11,8 +11,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import DOMPurify from 'dompurify';
 import * as api from '@/lib/api';
-import { ArrowLeft, Edit, Trash2, Plus, Mail, Phone, Building, Loader2, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Plus, Mail, Phone, Building, Loader2, User as UserIcon, Send, Reply, Inbox, ArrowUpRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -33,9 +34,53 @@ export default function ContactDetail() {
     date: new Date().toISOString(),
     notes: '',
   });
+  const [gmailStatus, setGmailStatus] = useState<api.GmailStatus>({ connected: false });
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [emailForm, setEmailForm] = useState({
+    subject: '',
+    body: '',
+    reply_to_message_id: undefined as string | undefined,
+    thread_id: undefined as string | undefined,
+  });
+  const [expandedEmailId, setExpandedEmailId] = useState<string | null>(null);
+
+  const loadUsers = async () => {
+    try {
+      const usersData = await api.getUsers();
+      setUsers(usersData);
+    } catch (error) {
+      console.error('Failed to load users:', error);
+    }
+  };
+
+  const loadGmailStatus = async () => {
+    try {
+      const status = await api.getGmailStatus();
+      setGmailStatus(status);
+    } catch (error) {
+      console.error('Failed to load Gmail status:', error);
+    }
+  };
+
+  const loadContact = useCallback(async (contactId: string) => {
+    try {
+      const [contactData, commData] = await Promise.all([
+        api.getContact(contactId),
+        api.getCommunications(contactId)
+      ]);
+      setContact(contactData);
+      setCommunications(commData);
+    } catch (_error) {
+      toast.error('Failed to load contact');
+      navigate('/contacts');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [navigate]);
 
   useEffect(() => {
     loadUsers();
+    loadGmailStatus();
     if (id === 'new') {
       setContact({
         id: 'new',
@@ -71,31 +116,6 @@ export default function ContactDetail() {
       loadContact(id);
     }
   }, [id, currentUser, loadContact]);
-
-  const loadUsers = async () => {
-    try {
-      const usersData = await api.getUsers();
-      setUsers(usersData);
-    } catch (error) {
-      console.error('Failed to load users:', error);
-    }
-  };
-
-  const loadContact = useCallback(async (contactId: string) => {
-    try {
-      const [contactData, commData] = await Promise.all([
-        api.getContact(contactId),
-        api.getCommunications(contactId)
-      ]);
-      setContact(contactData);
-      setCommunications(commData);
-    } catch (_error) {
-      toast.error('Failed to load contact');
-      navigate('/contacts');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [navigate]);
 
   const handleSave = async () => {
     if (!editForm.first_name || !editForm.last_name || !editForm.email) {
@@ -185,6 +205,40 @@ export default function ContactDetail() {
     }
   };
 
+  const handleSendEmail = async () => {
+    if (!contact || !emailForm.subject || !emailForm.body) {
+      toast.error('Please fill in subject and body');
+      return;
+    }
+    try {
+      const newComm = await api.sendGmailEmail({
+        to: contact.email,
+        subject: emailForm.subject,
+        body: emailForm.body,
+        contact_id: contact.id,
+        reply_to_message_id: emailForm.reply_to_message_id,
+        thread_id: emailForm.thread_id,
+      });
+      setCommunications([newComm, ...communications]);
+      setEmailForm({ subject: '', body: '', reply_to_message_id: undefined, thread_id: undefined });
+      setIsEmailDialogOpen(false);
+      toast.success('Email sent successfully');
+      if (id && id !== 'new') loadContact(id);
+    } catch (_error) {
+      toast.error('Failed to send email');
+    }
+  };
+
+  const handleReply = (comm: api.Communication) => {
+    setEmailForm({
+      subject: comm.subject?.startsWith('Re: ') ? comm.subject : `Re: ${comm.subject || ''}`,
+      body: '',
+      reply_to_message_id: comm.gmail_message_id,
+      thread_id: comm.gmail_thread_id,
+    });
+    setIsEmailDialogOpen(true);
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -200,23 +254,24 @@ export default function ContactDetail() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3 sm:gap-4">
             <Button variant="outline" size="icon" asChild>
               <Link to="/contacts">
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
-            <div>
-              <h2 className="text-3xl font-bold tracking-tight">
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-3xl font-bold tracking-tight truncate">
                 {contact.first_name} {contact.last_name}
               </h2>
-              <p className="text-muted-foreground">{contact.organization}</p>
+              <p className="text-muted-foreground text-sm sm:text-base">{contact.organization}</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 self-end sm:self-auto">
             <Button
               variant="outline"
+              size="sm"
               onClick={() => {
                 setEditForm({
                   first_name: contact.first_name,
@@ -234,12 +289,12 @@ export default function ContactDetail() {
                 setIsEditDialogOpen(true);
               }}
             >
-              <Edit className="mr-2 h-4 w-4" />
-              Edit
+              <Edit className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Edit</span>
             </Button>
-            <Button variant="destructive" onClick={() => setShowDeleteConfirm(true)}>
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
+            <Button variant="destructive" size="sm" onClick={() => setShowDeleteConfirm(true)}>
+              <Trash2 className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Delete</span>
             </Button>
           </div>
         </div>
@@ -352,10 +407,21 @@ export default function ContactDetail() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Communications</CardTitle>
-              <Button size="sm" onClick={() => setIsCommDialogOpen(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Log
-              </Button>
+              <div className="flex gap-2">
+                {gmailStatus.connected && id !== 'new' && (
+                  <Button size="sm" variant="outline" onClick={() => {
+                    setEmailForm({ subject: '', body: '', reply_to_message_id: undefined, thread_id: undefined });
+                    setIsEmailDialogOpen(true);
+                  }}>
+                    <Send className="mr-2 h-4 w-4" />
+                    Email
+                  </Button>
+                )}
+                <Button size="sm" onClick={() => setIsCommDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Log
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {communications.length > 0 ? (
@@ -363,11 +429,65 @@ export default function ContactDetail() {
                   {communications.map((comm) => (
                     <div key={comm.id} className="border-b border-border pb-4 last:border-0">
                       <div className="flex items-start justify-between">
-                        <div>
-                          <Badge variant="outline">{comm.type}</Badge>
-                          <p className="mt-2 text-sm">{comm.notes}</p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">{comm.type}</Badge>
+                            {comm.direction === 'inbound' && (
+                              <Badge variant="secondary" className="text-xs">
+                                <Inbox className="mr-1 h-3 w-3" />
+                                Received
+                              </Badge>
+                            )}
+                            {comm.direction === 'outbound' && (
+                              <Badge variant="secondary" className="text-xs">
+                                <ArrowUpRight className="mr-1 h-3 w-3" />
+                                Sent
+                              </Badge>
+                            )}
+                          </div>
+                          {comm.subject && (
+                            <p className="mt-1 text-sm font-medium">{comm.subject}</p>
+                          )}
+                          {comm.gmail_message_id ? (
+                            <div className="mt-1">
+                              {comm.email_from && (
+                                <p className="text-xs text-muted-foreground truncate">
+                                  From: {comm.email_from}
+                                </p>
+                              )}
+                              <button
+                                onClick={() => setExpandedEmailId(expandedEmailId === comm.id ? null : comm.id)}
+                                className="text-xs text-blue-600 hover:text-blue-800 mt-1"
+                              >
+                                {expandedEmailId === comm.id ? 'Hide' : 'Show'} content
+                              </button>
+                              {expandedEmailId === comm.id && (
+                                <div className="mt-2 rounded border p-3 bg-muted/30">
+                                  {comm.body_html ? (
+                                    <div
+                                      className="text-sm prose prose-sm max-w-none"
+                                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(comm.body_html) }}
+                                    />
+                                  ) : (
+                                    <p className="text-sm whitespace-pre-wrap">{comm.notes}</p>
+                                  )}
+                                </div>
+                              )}
+                              {gmailStatus.connected && comm.direction === 'inbound' && (
+                                <button
+                                  onClick={() => handleReply(comm)}
+                                  className="inline-flex items-center text-xs text-blue-600 hover:text-blue-800 mt-1 ml-2"
+                                >
+                                  <Reply className="mr-1 h-3 w-3" />
+                                  Reply
+                                </button>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="mt-2 text-sm">{comm.notes}</p>
+                          )}
                         </div>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-muted-foreground ml-2 shrink-0">
                           {new Date(comm.date).toLocaleDateString()}
                         </span>
                       </div>
@@ -554,6 +674,54 @@ export default function ContactDetail() {
               Cancel
             </Button>
             <Button onClick={handleAddCommunication}>Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Email Compose Dialog */}
+      <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              {emailForm.reply_to_message_id ? 'Reply to Email' : 'Compose Email'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>To</Label>
+              <Input value={contact?.email || ''} disabled />
+            </div>
+            <div className="space-y-2">
+              <Label>Subject</Label>
+              <Input
+                value={emailForm.subject}
+                onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })}
+                placeholder="Email subject"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Body</Label>
+              <Textarea
+                value={emailForm.body}
+                onChange={(e) => setEmailForm({ ...emailForm, body: e.target.value })}
+                rows={8}
+                placeholder="Write your email..."
+              />
+            </div>
+            {gmailStatus.gmail_address && (
+              <p className="text-xs text-muted-foreground">
+                Sending from: {gmailStatus.gmail_address}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEmailDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendEmail}>
+              <Send className="mr-2 h-4 w-4" />
+              Send
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -1,3 +1,4 @@
+import secrets
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -9,11 +10,14 @@ from app.auth import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
     create_access_token,
     create_password_reset_token,
+    create_refresh_token,
+    decode_refresh_token,
     get_current_active_user,
     get_current_admin_user,
     get_current_user_or_api_key,
     get_password_hash,
     validate_password,
+    verify_google_id_token,
     verify_password,
     verify_reset_token,
 )
@@ -21,10 +25,12 @@ from app.database import get_db
 from app.email import send_password_reset_email
 from app.models.models import User
 from app.schemas.schemas import (
+    GoogleAuthRequest,
     LoginRequest,
     PasswordChange,
     PasswordReset,
     PasswordResetRequest,
+    RefreshRequest,
     Token,
     UserCreate,
 )
@@ -59,12 +65,65 @@ def login(request: Request, login_request: LoginRequest, db: Session = Depends(g
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
+    refresh = create_refresh_token(data={"sub": user.email})
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "refresh_token": refresh, "token_type": "bearer"}
+
+
+@router.post("/google", response_model=Token)
+@limiter.limit("10/minute")
+def google_login(request: Request, google_auth: GoogleAuthRequest, db: Session = Depends(get_db)):
+    """Authenticate with Google ID token and return JWT token"""
+    id_info = verify_google_id_token(google_auth.credential)
+
+    google_id = id_info["sub"]
+    email = id_info["email"]
+    name = id_info.get("name", email.split("@")[0])
+
+    # Find user by Google ID first
+    user = db.query(User).filter(User.google_id == google_id).first()
+
+    if not user:
+        # Try to find by email to link existing account
+        user = db.query(User).filter(User.email == email).first()
+        if user:
+            user.google_id = google_id
+            if not user.auth_provider:
+                user.auth_provider = "google"
+            db.commit()
+        else:
+            # Create new user
+            user = User(
+                id=generate_id(),
+                email=email,
+                name=name,
+                hashed_password=get_password_hash(secrets.token_hex(32)),
+                role="user",
+                auth_provider="google",
+                google_id=google_id,
+                is_active=True,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive. Please contact an administrator.",
+        )
+
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
+    refresh = create_refresh_token(data={"sub": user.email})
+
+    return {"access_token": access_token, "refresh_token": refresh, "token_type": "bearer"}
 
 
 @router.post("/register", response_model=UserSchema)
+@limiter.limit("5/minute")
 def register(
+    request: Request,
     user_create: UserCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin_user),
@@ -100,6 +159,31 @@ def get_me(current_user: User = Depends(get_current_user_or_api_key)):
     if not current_user.is_active:  # pragma: no cover
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user account")
     return current_user
+
+
+@router.post("/refresh", response_model=Token)
+@limiter.limit("30/minute")
+def refresh_token(request: Request, body: RefreshRequest, db: Session = Depends(get_db)):
+    """Exchange a refresh token for a new access token + refresh token pair."""
+    email = decode_refresh_token(body.refresh_token)
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    new_access = create_access_token(data={"sub": user.email}, expires_delta=access_token_expires)
+    new_refresh = create_refresh_token(data={"sub": user.email})
+
+    return {"access_token": new_access, "refresh_token": new_refresh, "token_type": "bearer"}
 
 
 @router.post("/password-reset-request")

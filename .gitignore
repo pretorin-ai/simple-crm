@@ -29,6 +29,12 @@ backend/.coverage
 # Database files
 *.db
 
+# Backups
+backups/
+
+# mdbook build output
+docs/book
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -39,3 +45,4 @@ backend/.coverage
 *.njsproj
 *.sln
 *.sw?
+.claude/

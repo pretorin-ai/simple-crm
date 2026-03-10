@@ -11,7 +11,7 @@ from datetime import datetime
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.models.models import Contact, Contract, User
+from app.models.models import Contact, Contract, Opportunity, User
 from app.utils import generate_id
 
 logger = logging.getLogger(__name__)
@@ -41,33 +41,40 @@ def import_opportunities(
     db: Session,
 ) -> dict:
     """
-    Import SAM.gov opportunities as contracts.
+    Import SAM.gov opportunities as Opportunity records.
 
     Accepts a list of opportunity dicts with keys:
         noticeId, title, description, responseDeadLine, solicitationNumber,
         naicsCode, uiLink, pointOfContact, source, notes
 
-    Returns a dict with contracts_created, contracts_skipped, contacts_created, errors.
+    Returns a dict with:
+        contracts_created, contracts_skipped, contacts_created, errors.
+    (Keys kept as contracts_created/skipped for API compatibility.)
     """
     contracts_created = 0
     contracts_skipped = 0
     contacts_created = 0
     errors: list[str] = []
 
-    # Batch-load existing notice IDs to avoid per-item queries
-    notice_ids = [
-        opp.get("noticeId") or getattr(opp, "noticeId", None)
-        for opp in opportunities
-    ]
+    # Check for duplicates against both Opportunity and legacy Contract tables
+    notice_ids = [opp.get("noticeId") or getattr(opp, "noticeId", None) for opp in opportunities]
     notice_ids = [nid for nid in notice_ids if nid]
-    existing_notice_ids = set()
+    existing_notice_ids: set[str] = set()
     if notice_ids:
-        existing_rows = (
+        # Check opportunities table
+        opp_rows = (
+            db.query(Opportunity.sam_gov_notice_id)
+            .filter(Opportunity.sam_gov_notice_id.in_(notice_ids))
+            .all()
+        )
+        existing_notice_ids.update(row[0] for row in opp_rows if row[0])
+        # Check legacy contracts table
+        contract_rows = (
             db.query(Contract.sam_gov_notice_id)
             .filter(Contract.sam_gov_notice_id.in_(notice_ids))
             .all()
         )
-        existing_notice_ids = {row[0] for row in existing_rows}
+        existing_notice_ids.update(row[0] for row in contract_rows if row[0])
 
     # Batch-load existing contact emails to avoid O(n*m) queries
     all_poc_emails: set[str] = set()
@@ -81,9 +88,7 @@ def import_opportunities(
 
     existing_contacts_by_email: dict[str, Contact] = {}
     if all_poc_emails:
-        existing_contacts = (
-            db.query(Contact).filter(Contact.email.in_(all_poc_emails)).all()
-        )
+        existing_contacts = db.query(Contact).filter(Contact.email.in_(all_poc_emails)).all()
         existing_contacts_by_email = {c.email: c for c in existing_contacts}
 
     for opp in opportunities:
@@ -104,13 +109,8 @@ def import_opportunities(
             # Parse deadline
             raw_deadline = _get_field(opp, "responseDeadLine")
             deadline = _parse_deadline(raw_deadline)
-            if not deadline:
-                errors.append(f"No valid deadline for: {title}")
-                savepoint.rollback()
-                continue
 
             # Auto-create contacts from point of contact
-            contact_ids: list[str] = []
             if auto_create_contacts:
                 pocs = _get_field(opp, "pointOfContact") or []
                 for poc in pocs:
@@ -118,9 +118,7 @@ def import_opportunities(
                     poc_name = _get_field(poc, "fullName")
                     if poc_email and poc_name:
                         existing_contact = existing_contacts_by_email.get(poc_email)
-                        if existing_contact:
-                            contact_ids.append(existing_contact.id)
-                        else:
+                        if not existing_contact:
                             name_parts = poc_name.strip().split()
                             first_name = name_parts[0] if name_parts else "Unknown"
                             last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else ""
@@ -134,51 +132,38 @@ def import_opportunities(
                                 contact_type="government",
                                 status="warm",
                                 needs_follow_up=True,
-                                notes=f"Auto-imported from SAM.gov opportunity: {title}",
+                                notes=(f"Auto-imported from SAM.gov opportunity: {title}"),
                                 assigned_user_id=current_user.id,
                             )
                             db.add(new_contact)
                             db.flush()
-                            contact_ids.append(new_contact.id)
                             contacts_created += 1
-                            # Add to cache so subsequent POCs with same email are reused
                             existing_contacts_by_email[poc_email] = new_contact
 
-            # Build notes
-            notes_parts = [f"SAM.gov Notice ID: {notice_id}"]
             sol_num = _get_field(opp, "solicitationNumber")
-            if sol_num:
-                notes_parts.append(f"Solicitation #: {sol_num}")
             naics = _get_field(opp, "naicsCode")
-            if naics:
-                notes_parts.append(f"NAICS Code: {naics}")
-            extra_notes = _get_field(opp, "notes")
-            if extra_notes:
-                notes_parts.append(extra_notes)
 
-            source = _get_field(opp, "source") or "SAM.gov"
-
-            new_contract = Contract(
+            new_opp = Opportunity(
                 id=generate_id(),
-                title=title[:200],
+                title=title,
+                is_government_contract=True,
                 description=_get_field(opp, "description") or "",
-                source=source,
-                deadline=deadline,
-                status="prospective",
+                agency="",
+                solicitation_number=sol_num,
                 sam_gov_notice_id=notice_id,
+                naics_code=naics,
                 submission_link=_get_field(opp, "uiLink"),
-                notes="\n".join(notes_parts),
+                deadline=deadline,
+                proposal_due_date=deadline,
+                source="sam_gov",
+                stage="identified",
+                notes=_get_field(opp, "notes") or "",
                 created_by_user_id=current_user.id,
             )
 
-            if contact_ids:
-                contacts = db.query(Contact).filter(Contact.id.in_(contact_ids)).all()
-                new_contract.assigned_contacts = contacts
-
-            db.add(new_contract)
+            db.add(new_opp)
             savepoint.commit()
             contracts_created += 1
-            # Track so duplicates in the same batch are caught
             existing_notice_ids.add(notice_id)
 
         except Exception as e:

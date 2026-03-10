@@ -8,7 +8,8 @@ import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import * as api from '@/lib/api';
 import { getContactStatusBadge, getContactTypeBadge } from '@/lib/badges';
-import { Plus, Search, Mail, Phone, Loader2, Calendar } from 'lucide-react';
+import { ImportGmailContactsDialog } from '@/components/ImportGmailContactsDialog';
+import { Plus, Search, Mail, Phone, Loader2, Calendar, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ContactsList() {
@@ -16,9 +17,12 @@ export default function ContactsList() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [contacts, setContacts] = useState<api.Contact[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [gmailConnected, setGmailConnected] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   useEffect(() => {
     loadContacts();
+    api.getGmailStatus().then((s) => setGmailConnected(s.connected)).catch(() => {});
   }, []);
 
   const loadContacts = async () => {
@@ -65,23 +69,33 @@ export default function ContactsList() {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Contacts</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Contacts</h2>
             <p className="text-muted-foreground">
               Manage your contact relationships
             </p>
           </div>
-          <Button asChild>
-            <Link to="/contacts/new">
-              <Plus className="mr-2 h-4 w-4" />
-              Add Contact
-            </Link>
-          </Button>
+          <div className="flex gap-2">
+            {gmailConnected && (
+              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+                <Download className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Import from Gmail</span>
+                <span className="sm:hidden">Import</span>
+              </Button>
+            )}
+            <Button asChild>
+              <Link to="/contacts/new">
+                <Plus className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Add Contact</span>
+                <span className="sm:hidden">Add</span>
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {/* Search and Filter */}
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
@@ -93,7 +107,7 @@ export default function ContactsList() {
             />
           </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]" aria-label="Filter by status">
+            <SelectTrigger className="w-full sm:w-[180px]" aria-label="Filter by status">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
@@ -174,6 +188,12 @@ export default function ContactsList() {
           </Card>
         )}
       </div>
+
+      <ImportGmailContactsDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImportComplete={loadContacts}
+      />
     </Layout>
   );
 }

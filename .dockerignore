@@ -1,0 +1,31 @@
+# Git
+.git
+.github
+
+# Python
+backend/
+.venv
+__pycache__
+*.pyc
+.coverage
+.ruff_cache
+
+# Frontend dev artifacts
+frontend/node_modules
+frontend/dist
+frontend/.env.local
+
+# Docs build output (rebuilt in Docker)
+docs/book
+
+# Environment / secrets
+.env
+.env.local
+
+# Misc
+backups/
+*.db
+*.log
+.vscode
+.idea
+.DS_Store

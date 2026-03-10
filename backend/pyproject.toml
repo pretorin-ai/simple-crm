@@ -8,11 +8,11 @@ version = "1.0.0"
 description = "API for managing sales contacts and government contract opportunities"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi~=0.115.0",
+    "fastapi~=0.135.0",
     "uvicorn[standard]~=0.32.0",
     "sqlalchemy~=2.0.35",
-    "python-jose[cryptography]~=3.3.0",
-    "passlib~=1.7.4",
+    "PyJWT~=2.9.0",
+    "cryptography>=42.0.0",
     "bcrypt~=4.0.1",
     "python-multipart~=0.0.12",
     "pydantic~=2.9.2",
@@ -22,6 +22,14 @@ dependencies = [
     "python-dotenv~=1.0.1",
     "requests>=2.31.0",
     "psycopg2-binary~=2.9.9",
+    "alembic~=1.18.0",
+    "bleach~=6.3.0",
+    "python-json-logger~=3.3.0",
+    "prometheus-fastapi-instrumentator~=7.1.0",
+    "sentry-sdk[fastapi]~=2.19.0",
+    "google-api-python-client~=2.114.0",
+    "google-auth-oauthlib~=1.2.0",
+    "google-auth~=2.27.0",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +39,9 @@ dev = [
     "pytest-asyncio",
     "httpx",
     "ruff",
+    "freezegun",
+    "pip-audit",
+    "bandit",
 ]
 
 [project.scripts]
@@ -41,10 +52,17 @@ packages = ["app"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:asyncio",
+    "ignore::ResourceWarning:asyncio.base_events",
+    "default::pytest.PytestUnraisableExceptionWarning",
+]
 
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+extend-exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
@@ -57,4 +75,7 @@ fail_under = 100
 show_missing = true
 exclude_lines = [
     "pragma: no cover",
+]
+omit = [
+    "app/create_admin.py",
 ]

@@ -1,0 +1,16 @@
+[book]
+authors = ["Pretorin"]
+language = "en"
+src = "src"
+title = "Pretorin CRM Documentation"
+description = "Documentation for the Pretorin CRM platform - a government contracting relationship management system."
+
+[build]
+build-dir = "book"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+site-url = "/docs/"
+git-repository-url = "https://github.com/pretorin/simple-crm"
+additional-css = ["theme/custom.css"]

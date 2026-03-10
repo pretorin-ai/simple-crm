@@ -21,7 +21,7 @@ def test_get_users_as_regular_user(client, user_headers, regular_user):
 
 def test_get_users_no_auth(client):
     response = client.get("/users")
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 def test_get_users_inactive_user(client, db):

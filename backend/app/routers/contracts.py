@@ -33,6 +33,7 @@ def get_contracts(
     return (
         db.query(Contract)
         .options(selectinload(Contract.assigned_contacts))
+        .order_by(Contract.updated_at.desc())
         .offset(skip)
         .limit(limit)
         .all()
@@ -183,8 +184,19 @@ def delete_contract(
 
     _check_contract_authorization(contract, current_user)
 
+    from app.routers.audit import create_audit_entry
+
     db.delete(contract)
     db.commit()
+
+    create_audit_entry(
+        db,
+        user_id=current_user.id,
+        action="delete",
+        entity_type="contract",
+        entity_id=contract_id,
+        details=f"Deleted contract: {contract.title}",
+    )
     return None
 
 

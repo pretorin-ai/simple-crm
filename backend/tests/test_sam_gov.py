@@ -97,9 +97,7 @@ class TestSAMGovClient:
             "opportunitiesData": [],
         }
 
-        with patch.object(
-            client, "search_opportunities", side_effect=[page1, page2, page3]
-        ):
+        with patch.object(client, "search_opportunities", side_effect=[page1, page2, page3]):
             results = client.get_all_opportunities(
                 posted_from=datetime(2024, 1, 1),
                 posted_to=datetime(2024, 1, 10),
@@ -129,9 +127,7 @@ class TestSAMGovClient:
         client = SAMGovClient("key")
         from datetime import datetime
 
-        with patch.object(
-            client, "search_opportunities", side_effect=Exception("network error")
-        ):
+        with patch.object(client, "search_opportunities", side_effect=Exception("network error")):
             results = client.get_all_opportunities(
                 posted_from=datetime(2024, 1, 1),
                 posted_to=datetime(2024, 1, 2),
@@ -330,8 +326,9 @@ class TestSAMGovCollectEndpoint:
 
         assert response.status_code == 200
         data = response.json()
-        assert data["contracts_created"] == 0
-        assert len(data["errors"]) == 1
+        # Opportunities don't require a deadline, import succeeds
+        assert data["contracts_created"] == 1
+        assert len(data["errors"]) == 0
 
     @patch("app.routers.sam_gov.collect_opportunities")
     @patch.dict("os.environ", {"SAM_GOV_API_KEY": "test-key-123"})

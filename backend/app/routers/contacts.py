@@ -162,6 +162,17 @@ def delete_contact(
     if not contact:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contact not found")
 
+    from app.routers.audit import create_audit_entry
+
     db.delete(contact)
     db.commit()
+
+    create_audit_entry(
+        db,
+        user_id=current_user.id,
+        action="delete",
+        entity_type="contact",
+        entity_id=contact_id,
+        details=f"Deleted contact: {contact.first_name} {contact.last_name}",
+    )
     return None

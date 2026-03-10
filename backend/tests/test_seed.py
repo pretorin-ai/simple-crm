@@ -86,9 +86,27 @@ def test_seed_database_already_seeded(db):
     assert db.query(User).count() == 1
 
 
-@patch.dict("os.environ", {"ENV": "production"})
+@patch.dict("os.environ", {"ENV": "production", "SEED_DEMO_DATA": ""})
 def test_seed_database_skipped_in_production(db):
     """Seeding should be skipped in non-development environments."""
+    seed_database(db)
+    from app.models.models import User
+
+    assert db.query(User).count() == 0
+
+
+@patch.dict("os.environ", {"ENV": "production", "SEED_DEMO_DATA": "true"})
+def test_seed_database_production_with_flag(db):
+    """SEED_DEMO_DATA=true overrides the environment check."""
+    seed_database(db)
+    from app.models.models import User
+
+    assert db.query(User).count() == 1
+
+
+@patch.dict("os.environ", {"ENV": "production", "SEED_DEMO_DATA": "false"})
+def test_seed_database_production_flag_false(db):
+    """SEED_DEMO_DATA=false does not seed."""
     seed_database(db)
     from app.models.models import User
 

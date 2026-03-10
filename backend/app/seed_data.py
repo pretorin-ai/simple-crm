@@ -3,7 +3,18 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from app.auth import get_password_hash
-from app.models.models import Communication, Contact, Contract, User
+from app.models.models import (
+    Account,
+    Communication,
+    Compliance,
+    Contact,
+    Contract,
+    ContractVehicle,
+    Opportunity,
+    Proposal,
+    Teaming,
+    User,
+)
 from app.utils import generate_id
 
 logger = logging.getLogger(__name__)
@@ -230,10 +241,347 @@ def get_seed_user():
     )
 
 
+def get_seed_accounts():
+    """Return seed data for accounts (organizations)"""
+    return [
+        Account(
+            id=generate_id(),
+            name="Department of Defense",
+            account_type="government_agency",
+            parent_agency=None,
+            office="Office of the CIO",
+            location="Washington, DC",
+            website="https://www.defense.gov",
+            notes="Primary DoD engagement for cybersecurity contracts.",
+        ),
+        Account(
+            id=generate_id(),
+            name="General Services Administration",
+            account_type="government_agency",
+            parent_agency=None,
+            office="Federal Acquisition Service",
+            location="Washington, DC",
+            website="https://www.gsa.gov",
+            notes="GSA Schedule holder. Key procurement partner.",
+        ),
+        Account(
+            id=generate_id(),
+            name="Department of Homeland Security",
+            account_type="government_agency",
+            parent_agency=None,
+            office="Cybersecurity and Infrastructure Security Agency",
+            location="Arlington, VA",
+            website="https://www.dhs.gov",
+            notes="CISA engagement for critical infrastructure protection.",
+        ),
+        Account(
+            id=generate_id(),
+            name="Booz Allen Hamilton",
+            account_type="prime_contractor",
+            parent_agency=None,
+            office=None,
+            location="McLean, VA",
+            website="https://www.boozallen.com",
+            notes="Major prime contractor. Potential teaming partner on large DoD opportunities.",
+        ),
+        Account(
+            id=generate_id(),
+            name="Leidos",
+            account_type="prime_contractor",
+            parent_agency=None,
+            office=None,
+            location="Reston, VA",
+            website="https://www.leidos.com",
+            notes="Large prime contractor with strong DHS presence.",
+        ),
+        Account(
+            id=generate_id(),
+            name="CyberDefense Solutions LLC",
+            account_type="subcontractor",
+            parent_agency=None,
+            office=None,
+            location="Columbia, MD",
+            notes="Niche cybersecurity sub. Strong past performance in penetration testing.",
+        ),
+        Account(
+            id=generate_id(),
+            name="NASA",
+            account_type="government_agency",
+            parent_agency=None,
+            office="Office of the CIO",
+            location="Washington, DC",
+            website="https://www.nasa.gov",
+            notes="Emerging opportunity for cloud security.",
+        ),
+    ]
+
+
+def get_seed_vehicles():
+    """Return seed data for contract vehicles"""
+    base_date = datetime.now(timezone.utc)
+    return [
+        ContractVehicle(
+            id=generate_id(),
+            name="GSA Multiple Award Schedule (MAS)",
+            agency="General Services Administration",
+            contract_number="GS-35F-0001A",
+            expiration_date=base_date + timedelta(days=730),
+            ceiling_value=500000000,
+            prime_or_sub="prime",
+            notes="IT Schedule 70 / MAS consolidation. Covers IT services and solutions.",
+        ),
+        ContractVehicle(
+            id=generate_id(),
+            name="OASIS SB Pool 1",
+            agency="General Services Administration",
+            contract_number="GS00Q14OADS100",
+            expiration_date=base_date + timedelta(days=1095),
+            ceiling_value=60000000000,
+            prime_or_sub="prime",
+            notes="Best-in-Class vehicle for complex professional services.",
+        ),
+        ContractVehicle(
+            id=generate_id(),
+            name="SeaPort-NxG",
+            agency="Department of the Navy",
+            contract_number="N00178-19-D-0001",
+            expiration_date=base_date + timedelta(days=1825),
+            ceiling_value=None,
+            prime_or_sub="sub",
+            notes="Navy IDIQ for engineering, technical and programmatic support.",
+        ),
+    ]
+
+
+def get_seed_opportunities(accounts, vehicles, user_id):
+    """Return seed data for opportunities"""
+    base_date = datetime.now(timezone.utc)
+    dod = accounts[0]
+    gsa = accounts[1]
+    dhs = accounts[2]
+    nasa = accounts[6]
+
+    opps = [
+        Opportunity(
+            id=generate_id(),
+            title="DoD Zero Trust Architecture Implementation",
+            agency="Department of Defense",
+            account_id=dod.id,
+            naics_code="541512",
+            set_aside_type="small_business",
+            estimated_value=25000000,
+            solicitation_number="W15QKN-24-R-0042",
+            source="sam_gov",
+            stage="capture",
+            capture_manager_id=user_id,
+            expected_release_date=base_date + timedelta(days=30),
+            proposal_due_date=base_date + timedelta(days=60),
+            award_date_estimate=base_date + timedelta(days=120),
+            win_probability=45,
+            notes="Zero Trust implementation across DoD networks. Key focus area for FY25.",
+            created_by_user_id=user_id,
+        ),
+        Opportunity(
+            id=generate_id(),
+            title="GSA FedRAMP Authorization Support",
+            agency="General Services Administration",
+            account_id=gsa.id,
+            naics_code="541519",
+            set_aside_type="8a",
+            estimated_value=8500000,
+            solicitation_number="GSA-FAS-24-0087",
+            source="agency_forecast",
+            stage="qualified",
+            capture_manager_id=user_id,
+            expected_release_date=base_date + timedelta(days=45),
+            proposal_due_date=base_date + timedelta(days=90),
+            award_date_estimate=base_date + timedelta(days=150),
+            win_probability=60,
+            notes="FedRAMP package acceleration services. Strong alignment with our platform.",
+            created_by_user_id=user_id,
+        ),
+        Opportunity(
+            id=generate_id(),
+            title="DHS CISA Cyber Assessment Tools",
+            agency="Department of Homeland Security",
+            account_id=dhs.id,
+            naics_code="541512",
+            set_aside_type="full_and_open",
+            estimated_value=42000000,
+            solicitation_number="70RCSA24R00000015",
+            source="sam_gov",
+            stage="teaming",
+            capture_manager_id=user_id,
+            expected_release_date=base_date - timedelta(days=10),
+            proposal_due_date=base_date + timedelta(days=40),
+            award_date_estimate=base_date + timedelta(days=180),
+            win_probability=35,
+            notes="Large full & open. Need strong teaming partner. Booz Allen interested.",
+            created_by_user_id=user_id,
+        ),
+        Opportunity(
+            id=generate_id(),
+            title="NASA Cloud Security Modernization",
+            agency="NASA",
+            account_id=nasa.id,
+            naics_code="541519",
+            set_aside_type="small_business",
+            estimated_value=12000000,
+            solicitation_number="80NSSC24R0001",
+            source="partner_referral",
+            stage="identified",
+            capture_manager_id=user_id,
+            expected_release_date=base_date + timedelta(days=90),
+            proposal_due_date=None,
+            award_date_estimate=base_date + timedelta(days=270),
+            win_probability=25,
+            notes="Early stage. Referred by CyberDefense Solutions.",
+            created_by_user_id=user_id,
+        ),
+        Opportunity(
+            id=generate_id(),
+            title="DoD Endpoint Detection & Response",
+            agency="Department of Defense",
+            account_id=dod.id,
+            naics_code="541512",
+            set_aside_type="small_business",
+            estimated_value=18000000,
+            solicitation_number="W911QX-23-R-0055",
+            source="incumbent_recompete",
+            stage="proposal",
+            capture_manager_id=user_id,
+            expected_release_date=base_date - timedelta(days=30),
+            proposal_due_date=base_date + timedelta(days=14),
+            award_date_estimate=base_date + timedelta(days=90),
+            win_probability=55,
+            notes="Recompete of existing EDR contract. We are the incumbent.",
+            created_by_user_id=user_id,
+        ),
+        Opportunity(
+            id=generate_id(),
+            title="GSA IT Professional Services BPA",
+            agency="General Services Administration",
+            account_id=gsa.id,
+            naics_code="541511",
+            set_aside_type="wosb",
+            estimated_value=5000000,
+            solicitation_number=None,
+            source="internal",
+            stage="awarded",
+            capture_manager_id=user_id,
+            expected_release_date=base_date - timedelta(days=180),
+            proposal_due_date=base_date - timedelta(days=120),
+            award_date_estimate=base_date - timedelta(days=30),
+            win_probability=100,
+            notes="Won! BPA for IT professional services. 3 year base + 2 option years.",
+            created_by_user_id=user_id,
+        ),
+    ]
+
+    # Link vehicles to opportunities
+    if vehicles:
+        opps[0].vehicles = [vehicles[1]]  # OASIS
+        opps[1].vehicles = [vehicles[0]]  # GSA MAS
+        opps[4].vehicles = [vehicles[1]]  # OASIS
+
+    return opps
+
+
+def get_seed_teaming(opportunities, accounts):
+    """Return seed data for teaming relationships"""
+    booz = accounts[3]
+    leidos = accounts[4]
+    cyber_def = accounts[5]
+
+    return [
+        Teaming(
+            id=generate_id(),
+            opportunity_id=opportunities[2].id,  # DHS CISA
+            partner_account_id=booz.id,
+            role="prime",
+            status="nda_signed",
+            notes="Booz Allen as prime, we sub on cyber assessment tools.",
+        ),
+        Teaming(
+            id=generate_id(),
+            opportunity_id=opportunities[2].id,  # DHS CISA
+            partner_account_id=cyber_def.id,
+            role="subcontractor",
+            status="potential",
+            notes="CyberDefense for penetration testing scope.",
+        ),
+        Teaming(
+            id=generate_id(),
+            opportunity_id=opportunities[0].id,  # DoD Zero Trust
+            partner_account_id=leidos.id,
+            role="subcontractor",
+            status="teaming_agreed",
+            notes="Leidos subcontracting network engineering scope to us.",
+        ),
+    ]
+
+
+def get_seed_proposals(opportunities, user_id):
+    """Return seed data for proposals"""
+    base_date = datetime.now(timezone.utc)
+
+    return [
+        Proposal(
+            id=generate_id(),
+            opportunity_id=opportunities[4].id,  # DoD EDR (proposal stage)
+            proposal_manager_id=user_id,
+            submission_type="full",
+            submission_deadline=base_date + timedelta(days=14),
+            status="in_progress",
+            notes="Technical volume 60% complete. Pricing due next week.",
+        ),
+    ]
+
+
+def get_seed_compliance():
+    """Return seed data for compliance certifications"""
+    base_date = datetime.now(timezone.utc)
+
+    return [
+        Compliance(
+            id=generate_id(),
+            certification_type="small_business",
+            issued_by="U.S. Small Business Administration",
+            issue_date=base_date - timedelta(days=365),
+            expiration_date=base_date + timedelta(days=730),
+            status="active",
+            notes="Small business certification. Annual review required.",
+        ),
+        Compliance(
+            id=generate_id(),
+            certification_type="8a",
+            issued_by="U.S. Small Business Administration",
+            issue_date=base_date - timedelta(days=1000),
+            expiration_date=base_date + timedelta(days=95),
+            status="expiring_soon",
+            notes="8(a) certification expiring in ~3 months. Begin renewal process.",
+        ),
+        Compliance(
+            id=generate_id(),
+            certification_type="sdvosb",
+            issued_by="Department of Veterans Affairs",
+            issue_date=base_date - timedelta(days=200),
+            expiration_date=base_date + timedelta(days=530),
+            status="active",
+            notes="Service-Disabled Veteran-Owned Small Business certification.",
+        ),
+    ]
+
+
 def seed_database(db):
-    """Seed the database with initial data (development only)"""
+    """Seed the database with initial data.
+
+    Runs automatically in development. In other environments, set
+    SEED_DEMO_DATA=true to opt in.
+    """
     env = os.getenv("ENV", "development")
-    if env != "development":
+    seed_flag = os.getenv("SEED_DEMO_DATA", "").lower() in ("true", "1", "yes")
+    if env != "development" and not seed_flag:
         logger.info("Skipping database seeding in %s environment", env)
         return
 
@@ -248,23 +596,60 @@ def seed_database(db):
     # Add user
     user = get_seed_user()
     db.add(user)
-    db.flush()  # Flush to get user ID for contacts
+    db.flush()
 
-    # Add contacts
+    # Add accounts
+    accounts = get_seed_accounts()
+    for account in accounts:
+        db.add(account)
+    db.flush()
+
+    # Add contacts (link some to accounts)
     contacts = get_seed_contacts(user.id)
+    # Link government contacts to their agency accounts
+    contacts[0].account_id = accounts[0].id  # Sarah -> DoD
+    contacts[2].account_id = accounts[1].id  # Emily -> GSA
+    contacts[4].account_id = accounts[2].id  # Jennifer -> DHS
     for contact in contacts:
         db.add(contact)
-    db.flush()  # Flush to get IDs for relationships
+    db.flush()
 
     # Add communications
     communications = get_seed_communications(contacts)
     for communication in communications:
         db.add(communication)
 
-    # Add contracts
+    # Add contracts (legacy)
     contracts = get_seed_contracts(contacts)
     for contract in contracts:
         db.add(contract)
+
+    # Add contract vehicles
+    vehicles = get_seed_vehicles()
+    for vehicle in vehicles:
+        db.add(vehicle)
+    db.flush()
+
+    # Add opportunities
+    opportunities = get_seed_opportunities(accounts, vehicles, user.id)
+    for opp in opportunities:
+        db.add(opp)
+    db.flush()
+
+    # Add teaming records
+    teaming_records = get_seed_teaming(opportunities, accounts)
+    for teaming in teaming_records:
+        db.add(teaming)
+
+    # Add proposals
+    proposals = get_seed_proposals(opportunities, user.id)
+    for proposal in proposals:
+        db.add(proposal)
+
+    # Add compliance records
+    compliance_records = get_seed_compliance()
+    for record in compliance_records:
+        db.add(record)
 
     db.commit()
     logger.info("Database seeded successfully!")

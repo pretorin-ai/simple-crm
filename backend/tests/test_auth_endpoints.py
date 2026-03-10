@@ -122,7 +122,7 @@ def test_register_no_auth(client):
             "password": "password12345",
         },
     )
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 def test_get_me(client, admin_headers, admin_user):
@@ -135,7 +135,7 @@ def test_get_me(client, admin_headers, admin_user):
 
 def test_get_me_no_auth(client):
     response = client.get("/auth/me")
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 def test_get_me_inactive_user(client, db):
@@ -298,7 +298,7 @@ def test_password_change_no_auth(client):
             "new_password": "newpassword123",
         },
     )
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 def test_get_current_user_no_sub_in_token(client):
@@ -316,4 +316,62 @@ def test_get_current_user_nonexistent_email(client):
 
     token = create_access_token(data={"sub": "ghost@test.com"}, expires_delta=timedelta(minutes=30))
     response = client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401
+
+
+# --- Token refresh endpoint tests ---
+
+
+def test_refresh_token_success(client, admin_user):
+    """Login returns a refresh token, and refresh endpoint returns new tokens."""
+    login_resp = client.post(
+        "/auth/login", json={"email": "admin@test.com", "password": "adminpass123"}
+    )
+    assert login_resp.status_code == 200
+    refresh = login_resp.json()["refresh_token"]
+    assert refresh is not None
+
+    refresh_resp = client.post("/auth/refresh", json={"refresh_token": refresh})
+    assert refresh_resp.status_code == 200
+    data = refresh_resp.json()
+    assert "access_token" in data
+    assert "refresh_token" in data
+    assert data["token_type"] == "bearer"
+
+
+def test_refresh_token_invalid(client):
+    """Invalid refresh token returns 401."""
+    response = client.post("/auth/refresh", json={"refresh_token": "bad.token.value"})
+    assert response.status_code == 401
+
+
+def test_refresh_token_with_access_token(client, admin_user):
+    """An access token should not work as a refresh token."""
+    from app.auth import create_access_token
+
+    access = create_access_token(
+        data={"sub": "admin@test.com"}, expires_delta=timedelta(minutes=30)
+    )
+    response = client.post("/auth/refresh", json={"refresh_token": access})
+    assert response.status_code == 401
+
+
+def test_refresh_token_inactive_user(client, db, admin_user):
+    """Refresh token for inactive user returns 401."""
+    from app.auth import create_refresh_token
+
+    refresh = create_refresh_token(data={"sub": admin_user.email})
+    admin_user.is_active = False
+    db.commit()
+
+    response = client.post("/auth/refresh", json={"refresh_token": refresh})
+    assert response.status_code == 401
+
+
+def test_refresh_token_nonexistent_user(client):
+    """Refresh token for deleted user returns 401."""
+    from app.auth import create_refresh_token
+
+    refresh = create_refresh_token(data={"sub": "ghost@test.com"})
+    response = client.post("/auth/refresh", json={"refresh_token": refresh})
     assert response.status_code == 401

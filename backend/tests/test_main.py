@@ -15,7 +15,20 @@ def test_root(client):
 def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "healthy"}
+    assert response.json()["status"] == "healthy"
+
+
+def test_health_check_db_failure(client):
+    """Health check returns 503 when the database is unreachable."""
+    with patch(
+        "sqlalchemy.orm.session.Session.execute",
+        side_effect=RuntimeError("connection refused"),
+    ):
+        response = client.get("/health")
+    assert response.status_code == 503
+    data = response.json()
+    assert data["status"] == "unhealthy"
+    assert "database" in data["detail"]
 
 
 def test_favicon(client):
@@ -50,14 +63,12 @@ def test_lifespan_startup():
             pass
 
     with (
-        patch("app.main.Base.metadata.create_all") as mock_create,
         patch("app.main.seed_database") as mock_seed,
         patch("app.main.SessionLocal") as mock_session_cls,
     ):
         mock_db = MagicMock()
         mock_session_cls.return_value = mock_db
-        asyncio.get_event_loop().run_until_complete(run_lifespan())
-        mock_create.assert_called_once()
+        asyncio.run(run_lifespan())
         mock_seed.assert_called_once_with(mock_db)
         mock_db.close.assert_called_once()
 
@@ -75,6 +86,37 @@ def test_get_db_generator():
         pass
 
 
+def test_unhandled_exception_returns_json(admin_headers):
+    """Unhandled exceptions should return JSON, not plain text."""
+    from starlette.testclient import TestClient
+
+    from app.main import app
+
+    with (
+        patch("app.main.seed_database"),
+        TestClient(app, raise_server_exceptions=False) as c,
+        patch("app.routers.contacts.generate_id", side_effect=RuntimeError("boom")),
+    ):
+        response = c.post(
+            "/contacts",
+            headers=admin_headers,
+            json={
+                "first_name": "Test",
+                "last_name": "User",
+                "email": "t@t.com",
+                "phone": "",
+                "organization": "",
+                "contact_type": "individual",
+                "status": "cold",
+                "needs_follow_up": False,
+                "notes": "",
+            },
+        )
+    assert response.status_code == 500
+    data = response.json()
+    assert data["detail"] == "Internal server error"
+
+
 def test_extra_cors_origins():
     """Test that EXTRA_CORS_ORIGINS env var is processed."""
     import importlib
@@ -86,6 +128,10 @@ def test_extra_cors_origins():
         import app.main as main_mod
 
         importlib.reload(main_mod)
+        origins = main_mod.allowed_origins
+
+    assert "http://extra1.com" in origins
+    assert "http://extra2.com" in origins
 
     # Reload back to default to avoid affecting other tests
     with patch.dict("os.environ", {}, clear=False):

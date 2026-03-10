@@ -14,8 +14,14 @@ const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const ContactsList = lazy(() => import('./pages/ContactsList'));
 const ContactDetail = lazy(() => import('./pages/ContactDetail'));
-const ContractsList = lazy(() => import('./pages/ContractsList'));
-const ContractDetail = lazy(() => import('./pages/ContractDetail'));
+const AccountsList = lazy(() => import('./pages/AccountsList'));
+const AccountDetail = lazy(() => import('./pages/AccountDetail'));
+const OpportunitiesList = lazy(() => import('./pages/OpportunitiesList'));
+const OpportunityDetail = lazy(() => import('./pages/OpportunityDetail'));
+const Pipeline = lazy(() => import('./pages/Pipeline'));
+const VehiclesList = lazy(() => import('./pages/VehiclesList'));
+const VehicleDetail = lazy(() => import('./pages/VehicleDetail'));
+const ComplianceList = lazy(() => import('./pages/ComplianceList'));
 const UserManagement = lazy(() => import('./pages/UserManagement'));
 const ApiSettings = lazy(() => import('./pages/ApiSettings'));
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -41,10 +47,16 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/pipeline" element={<ProtectedRoute><Pipeline /></ProtectedRoute>} />
+              <Route path="/opportunities" element={<ProtectedRoute><OpportunitiesList /></ProtectedRoute>} />
+              <Route path="/opportunities/:id" element={<ProtectedRoute><OpportunityDetail /></ProtectedRoute>} />
+              <Route path="/accounts" element={<ProtectedRoute><AccountsList /></ProtectedRoute>} />
+              <Route path="/accounts/:id" element={<ProtectedRoute><AccountDetail /></ProtectedRoute>} />
               <Route path="/contacts" element={<ProtectedRoute><ContactsList /></ProtectedRoute>} />
               <Route path="/contacts/:id" element={<ProtectedRoute><ContactDetail /></ProtectedRoute>} />
-              <Route path="/contracts" element={<ProtectedRoute><ContractsList /></ProtectedRoute>} />
-              <Route path="/contracts/:id" element={<ProtectedRoute><ContractDetail /></ProtectedRoute>} />
+              <Route path="/vehicles" element={<ProtectedRoute><VehiclesList /></ProtectedRoute>} />
+              <Route path="/vehicles/:id" element={<ProtectedRoute><VehicleDetail /></ProtectedRoute>} />
+              <Route path="/compliance" element={<ProtectedRoute><ComplianceList /></ProtectedRoute>} />
               <Route path="/users" element={<AdminProtectedRoute><UserManagement /></AdminProtectedRoute>} />
               <Route path="/api-settings" element={<ProtectedRoute><ApiSettings /></ProtectedRoute>} />
               <Route path="*" element={<NotFound />} />

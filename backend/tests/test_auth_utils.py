@@ -3,15 +3,17 @@
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock
 
+import jwt
 import pytest
 from fastapi import HTTPException
-from jose import jwt
 
 from app.auth import (
     ALGORITHM,
     SECRET_KEY,
     create_access_token,
     create_password_reset_token,
+    create_refresh_token,
+    decode_refresh_token,
     generate_api_key,
     generate_password_reset_token,
     get_password_hash,
@@ -262,3 +264,43 @@ def test_get_user_from_api_key_exception(db):
     # Accessing .credentials raises
     result = get_user_from_api_key(credentials=creds, db=db)
     assert result is None
+
+
+# --- Refresh token tests ---
+
+
+def test_create_refresh_token():
+    token = create_refresh_token(data={"sub": "test@example.com"})
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    assert payload["sub"] == "test@example.com"
+    assert payload["type"] == "refresh"
+
+
+def test_create_refresh_token_custom_expiry():
+    token = create_refresh_token(data={"sub": "test@example.com"}, expires_delta=timedelta(days=1))
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    assert payload["sub"] == "test@example.com"
+    assert payload["type"] == "refresh"
+
+
+def test_decode_refresh_token_valid():
+    token = create_refresh_token(data={"sub": "test@example.com"})
+    email = decode_refresh_token(token)
+    assert email == "test@example.com"
+
+
+def test_decode_refresh_token_invalid():
+    assert decode_refresh_token("invalid.token.here") is None
+
+
+def test_decode_refresh_token_wrong_type():
+    """Access tokens should not be accepted as refresh tokens."""
+    access = create_access_token(data={"sub": "test@example.com"})
+    assert decode_refresh_token(access) is None
+
+
+def test_decode_refresh_token_expired():
+    token = create_refresh_token(
+        data={"sub": "test@example.com"}, expires_delta=timedelta(seconds=-1)
+    )
+    assert decode_refresh_token(token) is None

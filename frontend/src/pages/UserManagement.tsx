@@ -91,10 +91,10 @@ export default function UserManagement() {
   return (
     <Layout>
     <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Users className="h-8 w-8" />
+          <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+            <Users className="h-7 w-7 sm:h-8 sm:w-8" />
             User Management
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -144,18 +144,18 @@ export default function UserManagement() {
       <div className="grid gap-4">
         {users.map((user) => (
           <Card key={user.id}>
-            <CardContent className="flex items-center justify-between p-6">
-              <div className="flex items-center gap-4">
-                <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center">
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                   {user.role === 'admin' ? (
-                    <Shield className="h-6 w-6 text-blue-600" />
+                    <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
                   ) : (
-                    <Users className="h-6 w-6 text-gray-600" />
+                    <Users className="h-5 w-5 sm:h-6 sm:w-6 text-gray-600" />
                   )}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="font-semibold">{user.name}</h3>
-                  <p className="text-sm text-muted-foreground">{user.email}</p>
+                  <p className="text-sm text-muted-foreground truncate">{user.email}</p>
                   <div className="flex gap-2 mt-1">
                     <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
                       {user.role}
@@ -168,7 +168,7 @@ export default function UserManagement() {
               </div>
 
               {user.id !== currentUser?.id && (
-                <div className="flex gap-2">
+                <div className="flex gap-2 self-end sm:self-auto">
                   <Button
                     variant="outline"
                     size="sm"

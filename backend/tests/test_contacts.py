@@ -120,7 +120,7 @@ def test_create_contact_no_auth(client):
             "status": "cold",
         },
     )
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 def test_update_contact(client, admin_headers, sample_contact):

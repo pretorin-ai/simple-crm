@@ -164,4 +164,4 @@ def test_create_communication_no_auth(client, sample_contact):
             "notes": "Test",
         },
     )
-    assert response.status_code == 403
+    assert response.status_code == 401

@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { getApiKeyStatus, generateApiKey, revokeApiKey, ApiKeyStatus } from '@/lib/api';
+import { getApiKeyStatus, generateApiKey, revokeApiKey, ApiKeyStatus, getGmailStatus, getGmailAuthUrl, disconnectGmail, GmailStatus } from '@/lib/api';
 import { toast } from 'sonner';
-import { Key, Copy, Trash2, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Key, Copy, Trash2, AlertCircle, CheckCircle2, Loader2, Mail } from 'lucide-react';
 
 export default function ApiSettings() {
   const [apiKeyStatus, setApiKeyStatus] = useState<ApiKeyStatus | null>(null);
@@ -18,9 +19,28 @@ export default function ApiSettings() {
   const [showKey, setShowKey] = useState(false);
   const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
   const [showRevokeConfirm, setShowRevokeConfirm] = useState(false);
+  const [gmailStatus, setGmailStatus] = useState<GmailStatus | null>(null);
+  const [isConnectingGmail, setIsConnectingGmail] = useState(false);
+  const [showGmailDisconnectConfirm, setShowGmailDisconnectConfirm] = useState(false);
+  const [justConnectedGmail, setJustConnectedGmail] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
     loadApiKeyStatus();
+    loadGmailStatus();
+
+    if (searchParams.get('gmail') === 'connected') {
+      setJustConnectedGmail(true);
+      toast.success('Gmail connected successfully!');
+      searchParams.delete('gmail');
+      setSearchParams(searchParams, { replace: true });
+    } else if (searchParams.get('gmail') === 'error') {
+      const reason = searchParams.get('reason') || 'unknown';
+      toast.error(`Gmail connection failed: ${reason}`);
+      searchParams.delete('gmail');
+      searchParams.delete('reason');
+      setSearchParams(searchParams, { replace: true });
+    }
   }, []);
 
   const loadApiKeyStatus = async () => {
@@ -86,6 +106,37 @@ export default function ApiSettings() {
     setNewApiKey(null);
   };
 
+  const loadGmailStatus = async () => {
+    try {
+      const status = await getGmailStatus();
+      setGmailStatus(status);
+    } catch (error) {
+      console.error('Failed to load Gmail status:', error);
+    }
+  };
+
+  const handleConnectGmail = async () => {
+    setIsConnectingGmail(true);
+    try {
+      const { auth_url } = await getGmailAuthUrl();
+      window.location.href = auth_url;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to start Gmail connection');
+      setIsConnectingGmail(false);
+    }
+  };
+
+  const handleDisconnectGmail = async () => {
+    setShowGmailDisconnectConfirm(false);
+    try {
+      await disconnectGmail();
+      setGmailStatus({ connected: false });
+      toast.success('Gmail disconnected');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to disconnect Gmail');
+    }
+  };
+
   if (isLoading) {
     return (
       <Layout>
@@ -102,12 +153,74 @@ export default function ApiSettings() {
         <div>
           <h2 className="text-3xl font-bold tracking-tight flex items-center gap-2">
             <Key className="h-8 w-8" />
-            API Settings
+            API & Integrations
           </h2>
           <p className="text-muted-foreground mt-1">
-            Manage your API key for programmatic access
+            Manage your API key and external integrations
           </p>
         </div>
+
+        {/* Gmail Integration */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Gmail Integration
+            </CardTitle>
+            <CardDescription>
+              Connect your Gmail account to sync emails with contacts and send emails from the CRM
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Status</p>
+                <div className="flex items-center gap-2">
+                  {gmailStatus?.connected ? (
+                    <>
+                      <Badge variant="default" className="gap-1">
+                        <CheckCircle2 className="h-3 w-3" />
+                        Connected {justConnectedGmail && '🎉'}
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {gmailStatus.gmail_address}
+                      </span>
+                    </>
+                  ) : (
+                    <Badge variant="secondary">Not Connected</Badge>
+                  )}
+                </div>
+                {gmailStatus?.last_sync_at && (
+                  <p className="text-xs text-muted-foreground">
+                    Last synced: {new Date(gmailStatus.last_sync_at).toLocaleString()}
+                  </p>
+                )}
+              </div>
+              <div>
+                {gmailStatus?.connected ? (
+                  <Button variant="destructive" onClick={() => setShowGmailDisconnectConfirm(true)}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Disconnect
+                  </Button>
+                ) : (
+                  <Button onClick={handleConnectGmail} disabled={isConnectingGmail}>
+                    {isConnectingGmail ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-4 w-4 mr-2" />
+                        Connect Gmail
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* New API Key Display */}
         {showKey && newApiKey && (
@@ -360,6 +473,15 @@ export default function ApiSettings() {
         title="Revoke API Key"
         description="Are you sure you want to revoke your API key? Any applications using it will stop working immediately."
         confirmLabel="Revoke"
+      />
+
+      <ConfirmDialog
+        open={showGmailDisconnectConfirm}
+        onOpenChange={setShowGmailDisconnectConfirm}
+        onConfirm={handleDisconnectGmail}
+        title="Disconnect Gmail"
+        description="Are you sure you want to disconnect your Gmail account? Previously synced emails will remain in your communications, but no new emails will sync."
+        confirmLabel="Disconnect"
       />
     </Layout>
   );

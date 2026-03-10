@@ -407,8 +407,9 @@ def test_import_samgov_no_deadline(client, admin_headers):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["contracts_created"] == 0
-    assert len(data["errors"]) == 1
+    # Opportunities don't require a deadline, so import succeeds
+    assert data["contracts_created"] == 1
+    assert len(data["errors"]) == 0
 
 
 def test_import_samgov_bad_deadline_format(client, admin_headers):
@@ -429,8 +430,9 @@ def test_import_samgov_bad_deadline_format(client, admin_headers):
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["contracts_created"] == 0
-    assert len(data["errors"]) == 1
+    # Opportunities don't require a deadline, import succeeds with null deadline
+    assert data["contracts_created"] == 1
+    assert len(data["errors"]) == 0
 
 
 def test_import_samgov_alternate_date_format(client, admin_headers):

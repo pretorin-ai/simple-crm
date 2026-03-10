@@ -1,6 +1,10 @@
+# Authorization model: All authenticated users can list users (names, roles).
+# This is intentional — the user list is needed for contact/opportunity
+# assignment. User creation/mutation is admin-only. No sensitive fields
+# (password hashes, API keys) are exposed in the response schema.
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.auth import (
@@ -21,10 +25,14 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.get("", response_model=List[UserSchema])
-def get_users(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
+def get_users(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=100, ge=1, le=500),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
     """Get all users - available to all authenticated users"""
-    users = db.query(User).all()
-    return users
+    return db.query(User).order_by(User.name).offset(skip).limit(limit).all()
 
 
 @router.get("/{user_id}", response_model=UserSchema)

@@ -2,6 +2,7 @@
 """
 Script to run the FastAPI application
 """
+
 import os
 
 import uvicorn
